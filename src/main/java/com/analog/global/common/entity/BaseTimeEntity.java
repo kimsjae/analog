@@ -20,13 +20,13 @@ public abstract class BaseTimeEntity {
 	
 	@LastModifiedDate
 	@Column(nullable = false)
-	private LocalDateTime updateAt;
+	private LocalDateTime updatedAt;
 	
 	public LocalDateTime getCreatedAt() {
 		return createdAt;
 	}
 	
-	public LocalDateTime getUpdateAt() {
-		return updateAt;
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
 	}
 }
