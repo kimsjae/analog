@@ -11,6 +11,23 @@ import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+	
+	// 비즈니스 예외
+	@ExceptionHandler(BusinessException.class)
+	public ResponseEntity<ErrorResponse> handleBusinessException(
+			BusinessException ex,
+			HttpServletRequest request
+	) {
+		ErrorCode errorCode = ex.getErrorCode();
+		
+		return ResponseEntity
+				.status(errorCode.getHttpStatus())
+				.body(ErrorResponse.of(
+						errorCode,
+						ex.getMessage(),
+						request.getRequestURI()
+				));
+	}
 
 	// @Valid 검증 실패
 	@ExceptionHandler(MethodArgumentNotValidException.class)
