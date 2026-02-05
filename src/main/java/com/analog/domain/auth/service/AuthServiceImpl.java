@@ -1,0 +1,37 @@
+package com.analog.domain.auth.service;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.analog.domain.auth.dto.request.SignupRequest;
+import com.analog.domain.auth.dto.response.SignupResponse;
+import com.analog.domain.user.entity.User;
+import com.analog.domain.user.repository.UserRepository;
+import com.analog.global.error.BusinessException;
+import com.analog.global.error.ErrorCode;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+
+	private final UserRepository userRepository;
+	private final PasswordEncoder passwordEncoder;
+	
+	@Override
+	public SignupResponse signup(SignupRequest request) {
+		if (userRepository.existsByEmail(request.email())) {
+			throw new BusinessException(ErrorCode.RES_409, "이미 사용 중인 이메일입니다.");
+		}
+		
+		String encoded = passwordEncoder.encode(request.password());
+		User user = userRepository.save(
+				User.createLocal(request.email(), encoded, request.name())
+		);
+		
+		return new SignupResponse(user.getId(), user.getEmail(), user.getName());
+	}
+}
