@@ -7,6 +7,9 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
 import javax.crypto.SecretKey;
+
+import com.analog.global.config.JwtProperties;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;

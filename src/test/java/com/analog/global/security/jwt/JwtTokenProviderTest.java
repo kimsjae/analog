@@ -11,6 +11,8 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
+import com.analog.global.config.JwtProperties;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 

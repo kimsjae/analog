@@ -35,3 +35,8 @@ security:
     secret: "비밀키 입력"
     access-token-exp-seconds: 900
     refresh-token-exp-seconds: 1209600
+
+auth:
+  cookie:
+    refresh:
+      secure: false

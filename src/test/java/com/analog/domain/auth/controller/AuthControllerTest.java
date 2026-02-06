@@ -1,7 +1,11 @@
 package com.analog.domain.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -134,5 +139,26 @@ public class AuthControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body))
 		.andExpect(status().isUnauthorized());
+	}
+	
+	@Test
+	void jwt_login_and_refresh_cookie_success() throws Exception {
+		User user = userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{
+						"email": "test@test.com",
+						"password": "123123"
+						}
+						"""))
+		.andExpect(status().isOk())
+		.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=")))
+		.andExpect(jsonPath("$.accessToken").isNotEmpty())
+        .andExpect(jsonPath("$.userId").value(user.getId()))
+        .andExpect(jsonPath("$.email").value("test@test.com"))
+        .andExpect(jsonPath("$.name").value("tester"))
+        .andExpect(content().string(not(containsString("refreshToken"))));
 	}
 }

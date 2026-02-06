@@ -1,4 +1,4 @@
-package com.analog.global.security.jwt;
+package com.analog.global.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

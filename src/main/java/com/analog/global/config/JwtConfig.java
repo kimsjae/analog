@@ -1,9 +1,11 @@
-package com.analog.global.security.jwt;
+package com.analog.global.config;
 
 import java.time.Clock;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import com.analog.global.security.jwt.JwtTokenProvider;
 
 @Configuration
 public class JwtConfig {

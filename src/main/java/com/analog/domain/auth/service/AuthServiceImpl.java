@@ -6,12 +6,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.analog.domain.auth.dto.request.LoginRequest;
 import com.analog.domain.auth.dto.request.SignupRequest;
+import com.analog.domain.auth.dto.response.AuthTokens;
 import com.analog.domain.auth.dto.response.LoginResponse;
 import com.analog.domain.auth.dto.response.SignupResponse;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.error.BusinessException;
 import com.analog.global.error.ErrorCode;
+import com.analog.global.security.jwt.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +24,7 @@ public class AuthServiceImpl implements AuthService {
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final JwtTokenProvider jwtTokenProvider;
 	
 	@Override
 	public SignupResponse signup(SignupRequest request) {
@@ -39,7 +42,7 @@ public class AuthServiceImpl implements AuthService {
 	
 	@Transactional(readOnly = true)
 	@Override
-	public LoginResponse login(LoginRequest request) {
+	public AuthTokens login(LoginRequest request) {
 		User user = userRepository.findByEmail(request.email())
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_401));
 		
@@ -49,6 +52,17 @@ public class AuthServiceImpl implements AuthService {
 			throw new BusinessException(ErrorCode.AUTH_401);
 		}
 		
-		return new LoginResponse(user.getId(), user.getEmail());
+		String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getName());
+		
+		String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getEmail(), user.getName());
+		
+		LoginResponse response = new LoginResponse(
+				user.getId(),
+				user.getEmail(),
+				user.getName(),
+				accessToken
+		);
+		
+		return new AuthTokens(response, refreshToken);
 	}
 }
