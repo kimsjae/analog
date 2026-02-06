@@ -82,4 +82,57 @@ public class AuthControllerTest {
         .andExpect(jsonPath("$.message").value("이미 사용 중인 이메일입니다."))
         .andExpect(jsonPath("$.path").value("/api/auth/signup"));
 	}
+	
+	@Test
+	void login_success_200() throws Exception {
+		userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		String body = """
+				{
+				"email": "test@test.com",
+				"password": "123123"
+				}
+				""";
+		
+		mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+		.andExpect(status().isOk())
+		.andExpect(jsonPath("$.userId").isNumber())
+        .andExpect(jsonPath("$.email").value("test@test.com"));
+	}
+	
+	
+	@Test
+	void login_fail_400() throws Exception {
+		userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		String body = """
+				{
+				"email": "test11@test.com"
+				}
+				""";
+		
+		mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+		.andExpect(status().isBadRequest());
+	}
+	
+	@Test
+	void login_fail_401() throws Exception {
+		userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		String body = """
+				{
+				"email": "test11@test.com",
+				"password": "123213"
+				}
+				""";
+		
+		mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+		.andExpect(status().isUnauthorized());
+	}
 }

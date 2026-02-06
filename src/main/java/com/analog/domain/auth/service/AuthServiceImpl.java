@@ -4,7 +4,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.analog.domain.auth.dto.request.LoginRequest;
 import com.analog.domain.auth.dto.request.SignupRequest;
+import com.analog.domain.auth.dto.response.LoginResponse;
 import com.analog.domain.auth.dto.response.SignupResponse;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
@@ -33,5 +35,20 @@ public class AuthServiceImpl implements AuthService {
 		);
 		
 		return new SignupResponse(user.getId(), user.getEmail(), user.getName());
+	}
+	
+	@Transactional(readOnly = true)
+	@Override
+	public LoginResponse login(LoginRequest request) {
+		User user = userRepository.findByEmail(request.email())
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_401));
+		
+		boolean matched = passwordEncoder.matches(request.password(), user.getPassword());
+		
+		if (!matched) {
+			throw new BusinessException(ErrorCode.AUTH_401);
+		}
+		
+		return new LoginResponse(user.getId(), user.getEmail());
 	}
 }
