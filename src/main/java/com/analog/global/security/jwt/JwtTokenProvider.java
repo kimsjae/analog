@@ -13,6 +13,7 @@ import com.analog.global.config.JwtProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 public class JwtTokenProvider {
 
@@ -26,50 +27,43 @@ public class JwtTokenProvider {
         this.secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(props.secret()));
     }
 
-    public String createAccessToken(long userId, String email, String name) {
-        return createToken(userId, email, name, TokenType.ACCESS, props.accessTokenExpSeconds());
+    public String createAccessToken(long userId) {
+        return createToken(userId, TokenType.ACCESS, props.accessTokenExpSeconds());
     }
 
-    public String createRefreshToken(long userId, String email, String name) {
-        return createToken(userId, email, name, TokenType.REFRESH, props.refreshTokenExpSeconds());
+    public String createRefreshToken(long userId) {
+        return createToken(userId, TokenType.REFRESH, props.refreshTokenExpSeconds());
     }
 
-    private String createToken(long userId, String email, String name, TokenType type, long expSeconds) {
+    private String createToken(long userId, TokenType type, long expSeconds) {
         Instant now = clock.instant();
         Instant exp = now.plusSeconds(expSeconds);
 
         return Jwts.builder()
+        		.id(UUID.randomUUID().toString())
                 .issuer(props.issuer())
                 .subject(String.valueOf(userId))
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
-                .claim("email", email)
-                .claim("name", name)
                 .claim("typ", type.name())
                 .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 
-    public void validateOrThrow(String token, TokenType expectedType) {
-        Claims claims = parseClaims(token);
-
-        if (expectedType != null) {
-            String typ = claims.get("typ", String.class);
-            if (typ == null || !expectedType.name().equals(typ)) {
-                throw new JwtException("Invalid token type");
-            }
-        }
-    }
-
     public JwtClaims parse(String token) {
         Claims claims = parseClaims(token);
 
-        long userId = Long.parseLong(claims.getSubject());
-        String email = claims.get("email", String.class);
-        String name = claims.get("name", String.class);
+        Long userId = Long.parseLong(claims.getSubject());
         String typ = claims.get("typ", String.class);
+        if (typ == null) {
+        	throw new JwtException("Missing token type");
+        }
+        TokenType tokenType = TokenType.valueOf(typ);
+        String tokenId = claims.getId();
+        Date exp = claims.getExpiration();
+        Instant expiresAt = (exp == null) ? null : exp.toInstant();
 
-        return new JwtClaims(userId, email, name, TokenType.valueOf(typ));
+        return new JwtClaims(userId, tokenType, tokenId, expiresAt);
     }
 
     private Claims parseClaims(String token) {

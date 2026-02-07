@@ -40,3 +40,4 @@ auth:
   cookie:
     refresh:
       secure: false
+      hmac-secret: "비밀키 입력"

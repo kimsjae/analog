@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.analog.domain.auth.dto.request.LoginRequest;
 import com.analog.domain.auth.dto.request.SignupRequest;
-import com.analog.domain.auth.dto.response.AuthTokens;
 import com.analog.domain.auth.dto.response.LoginResponse;
+import com.analog.domain.auth.dto.response.LoginBody;
 import com.analog.domain.auth.dto.response.SignupResponse;
 import com.analog.domain.auth.service.AuthService;
 import com.analog.global.config.RefreshCookieProperties;
@@ -40,10 +40,10 @@ public class AuthController {
 	}
 	
 	@PostMapping("/login")
-	public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
-		AuthTokens tokens = authService.login(request);
+	public ResponseEntity<LoginBody> login(@RequestBody @Valid LoginRequest request) {
+		LoginResponse response = authService.login(request);
 		
-		ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.refreshToken())
+		ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", response.refreshToken())
 				.httpOnly(true)
 				.secure(refreshCookieProperties.secure())
 				.sameSite("Lax")
@@ -52,6 +52,6 @@ public class AuthController {
 		
 		return ResponseEntity.ok()
 				.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-				.body(tokens.response());
+				.body(response.body());
 	}
 }

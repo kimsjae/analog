@@ -31,15 +31,10 @@ class JwtTokenProviderTest {
         JwtProperties props = new JwtProperties("analog", secret, 900, 1209600);
         JwtTokenProvider provider = new JwtTokenProvider(props, fixed);
 
-        String token = provider.createAccessToken(1L, "test@test.com", "tester");
-
-        assertThatCode(() -> provider.validateOrThrow(token, TokenType.ACCESS))
-                .doesNotThrowAnyException();
+        String token = provider.createAccessToken(1L);
 
         JwtClaims claims = provider.parse(token);
         assertThat(claims.userId()).isEqualTo(1L);
-        assertThat(claims.email()).isEqualTo("test@test.com");
-        assertThat(claims.name()).isEqualTo("tester");
         assertThat(claims.tokenType()).isEqualTo(TokenType.ACCESS);
 	}
 	
@@ -52,13 +47,14 @@ class JwtTokenProviderTest {
         JwtProperties props = new JwtProperties("analog", secret, 1, 2);
 
         JwtTokenProvider provider = new JwtTokenProvider(props, fixed);
-        String token = provider.createAccessToken(1L, "test@test.com", "tester");
+        String token = provider.createAccessToken(1L);
 
         Clock later = Clock.fixed(now.plusSeconds(2), ZoneOffset.UTC);
         JwtTokenProvider laterProvider = new JwtTokenProvider(props, later);
 
-        assertThatThrownBy(() -> laterProvider.validateOrThrow(token, TokenType.ACCESS))
-                .isInstanceOf(ExpiredJwtException.class);
+        assertThatThrownBy(() -> laterProvider.parse(token))
+        .isInstanceOf(ExpiredJwtException.class);
+
     }
 
     @Test
@@ -72,9 +68,9 @@ class JwtTokenProviderTest {
         JwtTokenProvider providerA = new JwtTokenProvider(new JwtProperties("analog", secretA, 900, 1209600), fixed);
         JwtTokenProvider providerB = new JwtTokenProvider(new JwtProperties("analog", secretB, 900, 1209600), fixed);
 
-        String token = providerA.createAccessToken(1L, "test@test.com", "tester");
+        String token = providerA.createAccessToken(1L);
 
-        assertThatThrownBy(() -> providerB.validateOrThrow(token, TokenType.ACCESS))
+        assertThatThrownBy(() -> providerB.parse(token))
                 .isInstanceOf(JwtException.class);
     }
 
@@ -86,9 +82,9 @@ class JwtTokenProviderTest {
         String secret = base64Secret("01234567890123456789012345678901");
         JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties("analog", secret, 900, 1209600), fixed);
 
-        String refresh = provider.createRefreshToken(1L, "test@test.com", "tester");
+        String refresh = provider.createRefreshToken(1L);
 
-        assertThatThrownBy(() -> provider.validateOrThrow(refresh, TokenType.ACCESS))
+        assertThatThrownBy(() -> provider.parse(refresh))
                 .isInstanceOf(JwtException.class);
     }
 }

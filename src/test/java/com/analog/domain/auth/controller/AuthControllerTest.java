@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,9 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import com.analog.domain.auth.refreshToken.entity.RefreshToken;
+import com.analog.domain.auth.refreshToken.hash.RefreshTokenHasher;
+import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
+import com.jayway.jsonpath.JsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
@@ -33,10 +40,17 @@ public class AuthControllerTest {
 	UserRepository userRepository;
 	
 	@Autowired
+	RefreshTokenRepository refreshTokenRepository;
+	
+	@Autowired
+	RefreshTokenHasher refreshTokenHasher;
+	
+	@Autowired
 	PasswordEncoder passwordEncoder;
 	
 	@AfterEach
 	void tearDown() {
+		refreshTokenRepository.deleteAll();
 		userRepository.deleteAll();
 	}
 	
@@ -160,5 +174,28 @@ public class AuthControllerTest {
         .andExpect(jsonPath("$.email").value("test@test.com"))
         .andExpect(jsonPath("$.name").value("tester"))
         .andExpect(content().string(not(containsString("refreshToken"))));
+	}
+	
+	@Test
+	void login_persists_refresh_token_hash() throws Exception {
+		User user = userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		MvcResult result = mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{
+						"email": "test@test.com",
+						"password": "123123"
+						}
+						"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		
+		var cookie = result.getResponse().getCookie("refreshToken");
+		String rawRefresh = cookie.getValue();
+		RefreshToken saved = refreshTokenRepository.findByUserId(user.getId()).orElseThrow();
+		
+		assertThat(saved.getTokenHash()).isEqualTo(refreshTokenHasher.hash(rawRefresh));
+		assertThat(saved.getExpiresAt()).isNotNull();
 	}
 }

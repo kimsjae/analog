@@ -1,10 +1,12 @@
 package com.analog.global.security.jwt;
 
+import java.time.Instant;
+
 public record JwtClaims(
 		Long userId,
-		String email,
-		String name,
-		TokenType tokenType
+		TokenType tokenType,
+		String tokenId,
+		Instant expiresAt
 ) {
 
 }

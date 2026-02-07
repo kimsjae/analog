@@ -4,7 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "auth.cookie.refresh")
 public record RefreshCookieProperties(
-		boolean secure
+		boolean secure,
+		String hmacSecret
 ) {
 
 }
