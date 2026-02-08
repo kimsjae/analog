@@ -30,6 +30,8 @@ import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.security.jwt.JwtClaims;
 import com.analog.global.security.jwt.JwtTokenProvider;
 
+import jakarta.servlet.http.Cookie;
+
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
 public class AuthControllerTest {
@@ -263,4 +265,66 @@ public class AuthControllerTest {
 	    mockMvc.perform(post("/api/auth/reissue").cookie(oldCookie))
         .andExpect(status().isUnauthorized());
 	}
+	
+	@Test
+	void logout_success_204() throws Exception {
+		User user = userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		String body = """
+				{
+				"email": "test@test.com",
+				"password": "123123"
+				}
+				""";
+		
+		MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+		.andExpect(status().isOk())
+        .andReturn();
+		
+		Cookie refreshCookie = loginResult.getResponse().getCookie("refreshToken");
+		assertThat(refreshCookie).isNotNull();
+		
+		mockMvc.perform(post("/api/auth/logout")
+				.cookie(refreshCookie))
+		.andExpect(status().isNoContent())
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken")))
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")))
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/api/auth")));
+		
+		assertThat(refreshTokenRepository.findByUserId(user.getId())).isEmpty();
+	}
+	
+	@Test
+	void logout_fails_401() throws Exception {
+	    mockMvc.perform(post("/api/auth/logout"))
+	            .andExpect(status().isUnauthorized());
+
+	    User user = userRepository.save(
+	            User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester")
+	    );
+
+	    String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+	    MockCookie accessCookie = new MockCookie("refreshToken", accessToken);
+
+	    mockMvc.perform(post("/api/auth/logout").cookie(accessCookie))
+	            .andExpect(status().isUnauthorized());
+
+	    MockCookie invalidJwt = new MockCookie("refreshToken", "not-a-jwt");
+	    mockMvc.perform(post("/api/auth/logout").cookie(invalidJwt))
+	            .andExpect(status().isUnauthorized());
+
+	    String savedRefresh = jwtTokenProvider.createRefreshToken(user.getId());
+	    JwtClaims savedClaims = jwtTokenProvider.parse(savedRefresh);
+	    refreshTokenService.upsert(user, savedRefresh, savedClaims.tokenId(), savedClaims.expiresAt());
+
+	    String differentRefresh = jwtTokenProvider.createRefreshToken(user.getId());
+	    MockCookie mismatchCookie = new MockCookie("refreshToken", differentRefresh);
+
+	    mockMvc.perform(post("/api/auth/logout").cookie(mismatchCookie))
+	            .andExpect(status().isUnauthorized());
+	}
+
+
 }

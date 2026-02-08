@@ -1,5 +1,7 @@
 package com.analog.domain.auth.service;
 
+import java.util.Optional;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,5 +113,39 @@ public class AuthServiceImpl implements AuthService {
 		refreshTokenService.upsert(stored.getUser(), newRefreshToken, newRefreshClaims.tokenId(), newRefreshClaims.expiresAt());
 		
 		return new ReissueResponse(newAccessToken, newRefreshToken);
+	}
+	
+	@Override
+	public void logout(String rawRefreshToken) {
+		if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+			throw new BusinessException(ErrorCode.AUTH_401);
+		}
+		
+		final JwtClaims claims;
+		try {
+			claims = jwtTokenProvider.parse(rawRefreshToken);
+		} catch (Exception e) {
+			throw new BusinessException(ErrorCode.AUTH_401);
+		}
+		
+		if (claims.tokenType() != TokenType.REFRESH) {
+			throw new BusinessException(ErrorCode.AUTH_401);
+		}
+		
+		Long userId = claims.userId();
+		String tokenId = claims.tokenId();
+		Optional<RefreshToken> optional = refreshTokenRepository.findByUserId(userId);
+		if (optional.isEmpty()) {
+			return;
+		}
+		
+		RefreshToken saved = optional.get();
+		String tokenHash = refreshTokenHasher.hash(rawRefreshToken);
+		boolean matches = saved.getTokenId().equals(tokenId) && saved.getTokenHash().equals(tokenHash);
+		if (!matches) {
+			throw new BusinessException(ErrorCode.AUTH_401);
+		}
+		
+		refreshTokenRepository.delete(saved);
 	}
 }
