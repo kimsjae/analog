@@ -5,6 +5,7 @@ import java.net.URI;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,8 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.analog.domain.auth.dto.request.LoginRequest;
 import com.analog.domain.auth.dto.request.SignupRequest;
-import com.analog.domain.auth.dto.response.LoginResponse;
 import com.analog.domain.auth.dto.response.LoginBody;
+import com.analog.domain.auth.dto.response.LoginResponse;
+import com.analog.domain.auth.dto.response.ReissueResponse;
 import com.analog.domain.auth.dto.response.SignupResponse;
 import com.analog.domain.auth.service.AuthService;
 import com.analog.global.config.RefreshCookieProperties;
@@ -53,5 +55,21 @@ public class AuthController {
 		return ResponseEntity.ok()
 				.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
 				.body(response.body());
+	}
+	
+	@PostMapping("/reissue")
+	public ResponseEntity<String> reissue(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+		ReissueResponse response = authService.reissue(refreshToken);
+		
+		ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", response.refreshToken())
+				.httpOnly(true)
+				.secure(refreshCookieProperties.secure())
+				.sameSite("Lax")
+				.path("/api/auth")
+				.build();
+		
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+				.body(response.accessToken());
 	}
 }

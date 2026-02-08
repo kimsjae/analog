@@ -9,8 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.nio.charset.StandardCharsets;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -25,9 +24,11 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.analog.domain.auth.refreshToken.entity.RefreshToken;
 import com.analog.domain.auth.refreshToken.hash.RefreshTokenHasher;
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
+import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
-import com.jayway.jsonpath.JsonPath;
+import com.analog.global.security.jwt.JwtClaims;
+import com.analog.global.security.jwt.JwtTokenProvider;
 
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
@@ -40,6 +41,9 @@ public class AuthControllerTest {
 	UserRepository userRepository;
 	
 	@Autowired
+	RefreshTokenService refreshTokenService;
+	
+	@Autowired
 	RefreshTokenRepository refreshTokenRepository;
 	
 	@Autowired
@@ -47,6 +51,9 @@ public class AuthControllerTest {
 	
 	@Autowired
 	PasswordEncoder passwordEncoder;
+	
+	@Autowired
+	JwtTokenProvider jwtTokenProvider;
 	
 	@AfterEach
 	void tearDown() {
@@ -197,5 +204,63 @@ public class AuthControllerTest {
 		
 		assertThat(saved.getTokenHash()).isEqualTo(refreshTokenHasher.hash(rawRefresh));
 		assertThat(saved.getExpiresAt()).isNotNull();
+	}
+	
+	@Test
+	void refresh_token_reissue_success_200() throws Exception {
+		User user = userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+		
+		String oldRefreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+		JwtClaims oldClaims = jwtTokenProvider.parse(oldRefreshToken);
+		refreshTokenService.upsert(user, oldRefreshToken, oldClaims.tokenId(), oldClaims.expiresAt());
+		
+		MockCookie oldCookie = new MockCookie("refreshToken", oldRefreshToken);
+		
+		MvcResult reissue = mockMvc.perform(post("/api/auth/reissue").cookie(oldCookie))
+				.andExpect(status().isOk())
+				.andReturn();
+		
+		String newAccessToken = reissue.getResponse().getContentAsString();
+		assertThat(newAccessToken).isNotBlank();
+		
+		String setCookie = reissue.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+		assertThat(setCookie).contains("refreshToken=");
+		
+		String newRefreshToken = setCookie.split(";")[0].split("=")[1];
+        assertThat(newRefreshToken).isNotBlank();
+        assertThat(newRefreshToken).isNotEqualTo(oldRefreshToken);
+	}
+	
+	@Test
+	void refresh_token_reissue_fails_401() throws Exception {
+		mockMvc.perform(post("/api/auth/reissue"))
+        .andExpect(status().isUnauthorized());
+		
+		MockCookie invalidFormat = new MockCookie("refreshToken", "not-a-jwt");
+
+	    mockMvc.perform(post("/api/auth/reissue").cookie(invalidFormat))
+	            .andExpect(status().isUnauthorized());
+	    
+	    User user = userRepository.save(
+	            User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester")
+	    );
+
+	    String refreshTokenNotSaved = jwtTokenProvider.createRefreshToken(user.getId());
+	    MockCookie notSavedCookie = new MockCookie("refreshToken", refreshTokenNotSaved);
+	    
+	    mockMvc.perform(post("/api/auth/reissue").cookie(notSavedCookie))
+	            .andExpect(status().isUnauthorized());
+	    
+	    String oldRefreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+	    JwtClaims oldClaims = jwtTokenProvider.parse(oldRefreshToken);
+	    refreshTokenService.upsert(user, oldRefreshToken, oldClaims.tokenId(), oldClaims.expiresAt());
+
+	    MockCookie oldCookie = new MockCookie("refreshToken", oldRefreshToken);
+	    
+	    mockMvc.perform(post("/api/auth/reissue").cookie(oldCookie))
+        .andExpect(status().isOk());
+	    
+	    mockMvc.perform(post("/api/auth/reissue").cookie(oldCookie))
+        .andExpect(status().isUnauthorized());
 	}
 }
