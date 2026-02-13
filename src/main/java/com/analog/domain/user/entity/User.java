@@ -87,11 +87,11 @@ public class User extends BaseTimeEntity {
 		return provider == AuthProvider.LOCAL;
 	}
 	
-	public void changeName(String name) {
+	public void updateName(String name) {
 		this.name = name;
 	}
 
-    public void changePasswordHash(String passwordHash) {
+    public void updatePasswordHash(String passwordHash) {
     	this.password = passwordHash;
     }
 
