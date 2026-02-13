@@ -1,5 +1,7 @@
 package com.analog.domain.user.controller;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -8,8 +10,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.analog.domain.user.dto.request.UpdateMeRequest;
+import com.analog.domain.user.dto.request.UpdatePasswordRequest;
 import com.analog.domain.user.dto.response.MeResponse;
+import com.analog.domain.user.dto.response.UpdatePasswordResponse;
 import com.analog.domain.user.service.UserService;
+import com.analog.global.config.RefreshCookieProperties;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
 	private final UserService userService;
+	private final RefreshCookieProperties refreshCookieProperties;
 	
 	@GetMapping("/me")
 	public ResponseEntity<MeResponse> me() {
@@ -29,5 +35,21 @@ public class UserController {
 	@PatchMapping("/me")
 	public ResponseEntity<MeResponse> updateMe(@Valid @RequestBody UpdateMeRequest request) {
 		return ResponseEntity.ok(userService.updateMe(request));
+	}
+	
+	@PatchMapping("/me/password")
+	public ResponseEntity<String> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
+		UpdatePasswordResponse tokens = userService.updatePassword(request);
+		
+		ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.refreshToken())
+				.httpOnly(true)
+				.secure(refreshCookieProperties.secure())
+				.sameSite("Lax")
+				.path("/api/auth")
+				.build();
+		
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+				.body(tokens.accessToken());
 	}
 }

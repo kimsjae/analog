@@ -3,6 +3,7 @@ package com.analog.domain.user.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,12 +14,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
+import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
+import com.analog.global.security.jwt.JwtClaims;
 import com.analog.global.security.jwt.JwtTokenProvider;
 
 @SpringBootTest
@@ -39,6 +44,9 @@ public class UserControllerTest {
     
     @Autowired
     PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    RefreshTokenService refreshTokenService;
     
     @AfterEach
     void tearDown() {
@@ -159,5 +167,153 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.path").value("/api/users/me"))
                 .andExpect(jsonPath("$.errorCode").value("RES_404"));
     }
+    
+    @Test
+    void update_password_success() throws Exception {
+    	User user = userRepository.save(User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester"));
+    	String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+    	String oldRefreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+        JwtClaims oldClaims = jwtTokenProvider.parse(oldRefreshToken);
+        refreshTokenService.upsert(user, oldRefreshToken, oldClaims.tokenId(), oldClaims.expiresAt());
+        
+        MvcResult result = mockMvc.perform(patch("/api/users/me/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .content("""
+                    {
+                      "currentPassword": "123123",
+                      "newPassword": "456456",
+                      "newPasswordConfirm": "456456"
+                    }
+                    """))
+        // then
+        .andExpect(status().isOk())
+        .andReturn();
+        
+        String newAccessToken = result.getResponse().getContentAsString();
+        assertThat(newAccessToken).isNotBlank();
 
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).contains("refreshToken=");
+
+        String newRefreshToken = setCookie.split(";")[0].split("=")[1];
+        assertThat(newRefreshToken).isNotBlank();
+
+        User updated = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(passwordEncoder.matches("456456", updated.getPassword())).isTrue();
+        
+        MockCookie oldCookie = new MockCookie("refreshToken", oldRefreshToken);
+        mockMvc.perform(post("/api/auth/reissue").cookie(oldCookie))
+                .andExpect(status().isUnauthorized());
+
+        MockCookie newCookie = new MockCookie("refreshToken", newRefreshToken);
+        mockMvc.perform(post("/api/auth/reissue").cookie(newCookie))
+                .andExpect(status().isOk());
+    }
+    
+    @Test
+    void update_password_fails() throws Exception {
+    	mockMvc.perform(patch("/api/users/me/password")
+    			.contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "currentPassword": "123123",
+                          "newPassword": "456456",
+                          "newPasswordConfirm": "456456"
+                        }
+                        """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+    	
+    	mockMvc.perform(patch("/api/users/me/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")
+                .content("""
+                    {
+                      "currentPassword": "123123",
+                      "newPassword": "456456",
+                      "newPasswordConfirm": "456456"
+                    }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+    	
+    	User user = userRepository.save(
+                User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester")
+        );
+
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+        mockMvc.perform(patch("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken)
+                        .content("""
+                            {
+                              "currentPassword": "123123",
+                              "newPassword": "456456",
+                              "newPasswordConfirm": "456456"
+                            }
+                            """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+
+        mockMvc.perform(patch("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .content("""
+                            {
+                              "currentPassword": "123123213",
+                              "newPassword": "456456",
+                              "newPasswordConfirm": "456456"
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+
+        mockMvc.perform(patch("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .content("""
+                            {
+                              "currentPassword": "123123",
+                              "newPassword": "456456",
+                              "newPasswordConfirm": "456456456"
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+
+
+        mockMvc.perform(patch("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .content("""
+                            {
+                              "currentPassword": "123123",
+                              "newPassword": "123123",
+                              "newPasswordConfirm": "123123"
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+
+        Long notExistsUserId = 2L;
+        String tokenForNotExists = jwtTokenProvider.createAccessToken(notExistsUserId);
+
+        mockMvc.perform(patch("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenForNotExists)
+                        .content("""
+                            {
+                              "currentPassword": "123123",
+                              "newPassword": "456456",
+                              "newPasswordConfirm": "456456"
+                            }
+                            """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.path").value("/api/users/me/password"));
+    }
+
+    
 }
