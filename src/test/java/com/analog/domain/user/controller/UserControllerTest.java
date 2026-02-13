@@ -1,9 +1,11 @@
 package com.analog.domain.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,7 +22,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
-import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
+import com.analog.domain.auth.service.RefreshTokenService;
+import com.analog.domain.diary.analysis.entity.AnalysisStatus;
+import com.analog.domain.diary.analysis.entity.DiaryAnalysis;
+import com.analog.domain.diary.analysis.repository.DiaryAnalysisRepository;
+import com.analog.domain.diary.entity.Diary;
+import com.analog.domain.diary.repository.DiaryRepository;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.security.jwt.JwtClaims;
@@ -47,6 +54,12 @@ public class UserControllerTest {
     
     @Autowired
     RefreshTokenService refreshTokenService;
+    
+    @Autowired
+    DiaryRepository diaryRepository;
+    
+    @Autowired
+    DiaryAnalysisRepository diaryAnalysisRepository;
     
     @AfterEach
     void tearDown() {
@@ -314,6 +327,85 @@ public class UserControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.path").value("/api/users/me/password"));
     }
-
     
+    @Test
+    void withdraw_success_204() throws Exception {
+    	User user = userRepository.save(
+                User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester")
+        );
+
+        Diary d1 = diaryRepository.save(Diary.create(user, "t1", "c1", java.time.LocalDate.now()));
+        Diary d2 = diaryRepository.save(Diary.create(user, null, "c2", java.time.LocalDate.now().minusDays(1)));
+
+        diaryAnalysisRepository.save(
+                DiaryAnalysis.create(d1, AnalysisStatus.SUCCESS, java.time.LocalDateTime.now())
+        );
+        
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+        
+        mockMvc.perform(delete("/api/users/me")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                		{
+                		"password": "123123"
+                		}
+                		"""))
+        .andExpect(status().isNoContent())
+        .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refreshToken=")))
+        .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+
+        assertThat(userRepository.findById(user.getId())).isEmpty();
+    }
+    
+    @Test
+    void withdraw_fails() throws Exception {
+        User user = userRepository.save(
+                User.createLocal("test@test.com", passwordEncoder.encode("123123"), "tester")
+        );
+        String validAccessToken = jwtTokenProvider.createAccessToken(user.getId());
+
+        mockMvc.perform(delete("/api/users/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        		{
+                        		"password": "123123"
+                        		}
+                        		"""))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").exists());
+
+        mockMvc.perform(delete("/api/users/me")
+                        .header("Authorization", "Bearer invalid.token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        		{
+                        		"password": "123123"
+                        		}
+                        		"""))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").exists());
+
+        mockMvc.perform(delete("/api/users/me")
+                        .header("Authorization", "Bearer " + validAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        		{
+                        		"password": "456456"
+                        		}
+                        		"""))
+                .andExpect(status().isUnauthorized());
+
+        userRepository.delete(user);
+
+        mockMvc.perform(delete("/api/users/me")
+                        .header("Authorization", "Bearer " + validAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        		{
+                        		"password": "123123"
+                        		}
+                        		"""))
+                .andExpect(status().isUnauthorized());
+    }
 }

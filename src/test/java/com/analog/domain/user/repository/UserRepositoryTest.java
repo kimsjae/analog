@@ -37,7 +37,7 @@ class UserRepositoryTest {
 		// then
 		User found = userRepository.findByEmail("test@test.com").orElseThrow();
 		assertThat(found.getEmail()).isEqualTo("test@test.com");
-		assertThat(found.isLocal()).isTrue();
+		assertThat(found.getProvider()).isEqualTo(AuthProvider.LOCAL);
 		assertThat(found.getCreatedAt()).isNotNull();
         assertThat(found.getUpdatedAt()).isNotNull();
 	}

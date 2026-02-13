@@ -83,10 +83,6 @@ public class User extends BaseTimeEntity {
         return new User(normalizedEmail, null, name, provider, providerId.trim(), UserRole.USER);
     }
 	
-	public boolean isLocal() {
-		return provider == AuthProvider.LOCAL;
-	}
-	
 	public void updateName(String name) {
 		this.name = name;
 	}

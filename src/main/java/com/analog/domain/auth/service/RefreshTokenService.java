@@ -1,4 +1,4 @@
-package com.analog.domain.auth.refreshToken.service;
+package com.analog.domain.auth.service;
 
 import java.time.Instant;
 

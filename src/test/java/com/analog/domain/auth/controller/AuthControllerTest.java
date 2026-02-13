@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.analog.domain.auth.refreshToken.entity.RefreshToken;
 import com.analog.domain.auth.refreshToken.hash.RefreshTokenHasher;
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
-import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
+import com.analog.domain.auth.service.RefreshTokenService;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.security.jwt.JwtClaims;

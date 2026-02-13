@@ -3,6 +3,7 @@ package com.analog.domain.user.controller;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -11,11 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.analog.domain.user.dto.request.UpdateMeRequest;
 import com.analog.domain.user.dto.request.UpdatePasswordRequest;
+import com.analog.domain.user.dto.request.WithdrawRequest;
 import com.analog.domain.user.dto.response.MeResponse;
 import com.analog.domain.user.dto.response.UpdatePasswordResponse;
 import com.analog.domain.user.service.UserService;
 import com.analog.global.config.RefreshCookieProperties;
+import com.analog.global.security.auth.AuthUser;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -51,5 +55,13 @@ public class UserController {
 		return ResponseEntity.ok()
 				.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
 				.body(tokens.accessToken());
+	}
+	
+	@DeleteMapping("/me")
+	public ResponseEntity<Void> withdrawMe(@Valid @RequestBody WithdrawRequest request, HttpServletResponse response) {
+		Long userId = AuthUser.requireUserId();
+		userService.withdraw(userId, request.password(), response);
+		
+		return ResponseEntity.noContent().build();
 	}
 }

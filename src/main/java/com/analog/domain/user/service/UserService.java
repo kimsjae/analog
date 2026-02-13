@@ -5,6 +5,8 @@ import com.analog.domain.user.dto.request.UpdatePasswordRequest;
 import com.analog.domain.user.dto.response.MeResponse;
 import com.analog.domain.user.dto.response.UpdatePasswordResponse;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 public interface UserService {
 
 	MeResponse me();
@@ -12,4 +14,6 @@ public interface UserService {
 	MeResponse updateMe(UpdateMeRequest request);
 	
 	UpdatePasswordResponse updatePassword(UpdatePasswordRequest request);
+	
+	void withdraw(Long userId, String password, HttpServletResponse response);
 }

@@ -1,15 +1,20 @@
 package com.analog.domain.user.service;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
-import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
+import com.analog.domain.auth.service.RefreshTokenService;
+import com.analog.domain.diary.analysis.repository.DiaryAnalysisRepository;
+import com.analog.domain.diary.repository.DiaryRepository;
 import com.analog.domain.user.dto.request.UpdateMeRequest;
 import com.analog.domain.user.dto.request.UpdatePasswordRequest;
 import com.analog.domain.user.dto.response.MeResponse;
 import com.analog.domain.user.dto.response.UpdatePasswordResponse;
+import com.analog.domain.user.entity.AuthProvider;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.error.BusinessException;
@@ -18,6 +23,7 @@ import com.analog.global.security.auth.AuthUser;
 import com.analog.global.security.jwt.JwtClaims;
 import com.analog.global.security.jwt.JwtTokenProvider;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -30,6 +36,8 @@ public class UserServiceImpl implements UserService {
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final RefreshTokenService refreshTokenService;
+	private final DiaryAnalysisRepository diaryAnalysisRepository;
+	private final DiaryRepository diaryRepository;
 	
 	@Override
 	@Transactional(readOnly = true)
@@ -83,5 +91,36 @@ public class UserServiceImpl implements UserService {
         refreshTokenService.upsert(user, newRefreshToken, newRefreshClaims.tokenId(), newRefreshClaims.expiresAt());
         
         return new UpdatePasswordResponse(newAccessToken, newRefreshToken);
+	}
+	
+	@Override
+	public void withdraw(Long userId, String password, HttpServletResponse response) {
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_401));
+		
+		if (user.getProvider() == AuthProvider.LOCAL) {
+			if (!passwordEncoder.matches(password, user.getPassword())) {
+				throw new BusinessException(ErrorCode.AUTH_401);
+			}
+		}
+		
+		refreshTokenRepository.deleteByUserId(userId);
+		expireRefreshCookie(response);
+		
+		diaryAnalysisRepository.deleteByDiaryUserId(userId);
+		diaryRepository.deleteByUserId(userId);
+		
+		userRepository.delete(user);
+	}
+	
+	private void expireRefreshCookie(HttpServletResponse response) {
+		ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+				.httpOnly(true)
+				.path("/api/auth")
+				.maxAge(0)
+				.sameSite("Lax")
+				.build();
+		
+		response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 	}
 }

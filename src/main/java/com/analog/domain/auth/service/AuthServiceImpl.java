@@ -15,7 +15,6 @@ import com.analog.domain.auth.dto.response.SignupResponse;
 import com.analog.domain.auth.refreshToken.entity.RefreshToken;
 import com.analog.domain.auth.refreshToken.hash.RefreshTokenHasher;
 import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
-import com.analog.domain.auth.refreshToken.service.RefreshTokenService;
 import com.analog.domain.user.entity.User;
 import com.analog.domain.user.repository.UserRepository;
 import com.analog.global.error.BusinessException;
