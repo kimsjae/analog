@@ -15,6 +15,9 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.analog.domain.user.entity.User;
+import com.analog.domain.user.repository.UserRepository;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -27,11 +30,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationEntryPoint authenticationEntryPoint;
+    private final UserRepository userRepository;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
-                                   AuthenticationEntryPoint authenticationEntryPoint) {
+                                   AuthenticationEntryPoint authenticationEntryPoint,
+                                   UserRepository userRepository) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -67,9 +73,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userId == null) {
                 throw new BadCredentialsException("Missing userId");
             }
+            
+            User user = userRepository.findById(userId)
+            		.orElseThrow(() -> new BadCredentialsException("User Not Found"));
 
             Authentication authentication =
-                    new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                    new UsernamePasswordAuthenticationToken(user, null, List.of());
 
             ((UsernamePasswordAuthenticationToken) authentication).setDetails(
                     new WebAuthenticationDetailsSource().buildDetails(request)
