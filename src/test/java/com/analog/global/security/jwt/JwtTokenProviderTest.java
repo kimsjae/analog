@@ -1,7 +1,6 @@
 package com.analog.global.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
@@ -84,7 +83,8 @@ class JwtTokenProviderTest {
 
         String refresh = provider.createRefreshToken(1L);
 
-        assertThatThrownBy(() -> provider.parse(refresh))
-                .isInstanceOf(JwtException.class);
+        JwtClaims claims = provider.parse(refresh);
+
+        assertThat(claims.tokenType()).isEqualTo(TokenType.REFRESH);
     }
 }

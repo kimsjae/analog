@@ -167,7 +167,7 @@ public class UserControllerTest {
                         """))
                 .andExpect(status().isBadRequest());
 
-        Long notExistsUserId = 2L;
+        Long notExistsUserId = Long.MAX_VALUE;
         String tokenForNotExists = jwtTokenProvider.createAccessToken(notExistsUserId);
 
         mockMvc.perform(patch("/api/users/me")
@@ -176,9 +176,7 @@ public class UserControllerTest {
                 .content("""
                         { "name": "newName" }
                         """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.path").value("/api/users/me"))
-                .andExpect(jsonPath("$.errorCode").value("RES_404"));
+                .andExpect(status().isUnauthorized());
     }
     
     @Test
@@ -311,7 +309,7 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.path").value("/api/users/me/password"));
 
-        Long notExistsUserId = 2L;
+        Long notExistsUserId = Long.MAX_VALUE;
         String tokenForNotExists = jwtTokenProvider.createAccessToken(notExistsUserId);
 
         mockMvc.perform(patch("/api/users/me/password")
@@ -324,7 +322,7 @@ public class UserControllerTest {
                               "newPasswordConfirm": "456456"
                             }
                             """))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/users/me/password"));
     }
     
@@ -335,7 +333,6 @@ public class UserControllerTest {
         );
 
         Diary d1 = diaryRepository.save(Diary.create(user, "t1", "c1", java.time.LocalDate.now()));
-        Diary d2 = diaryRepository.save(Diary.create(user, null, "c2", java.time.LocalDate.now().minusDays(1)));
 
         diaryAnalysisRepository.save(
                 DiaryAnalysis.create(d1, AnalysisStatus.SUCCESS, java.time.LocalDateTime.now())

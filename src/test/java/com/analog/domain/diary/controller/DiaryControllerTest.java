@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDate;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.analog.domain.auth.refreshToken.repository.RefreshTokenRepository;
 import com.analog.domain.diary.entity.Diary;
 import com.analog.domain.diary.repository.DiaryRepository;
 import com.analog.domain.user.entity.User;
@@ -40,6 +42,16 @@ public class DiaryControllerTest {
 	
 	@Autowired
 	JwtTokenProvider jwtTokenProvider;
+	
+	@Autowired
+	RefreshTokenRepository refreshTokenRepository;
+	
+	@AfterEach
+	void tearDown() {
+		diaryRepository.deleteAll();
+		refreshTokenRepository.deleteAll();
+		userRepository.deleteAll();
+	}
 	
 	@Test
 	void created_diary_success_201() throws Exception {

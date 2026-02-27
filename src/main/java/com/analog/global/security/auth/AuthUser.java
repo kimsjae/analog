@@ -14,28 +14,6 @@ public final class AuthUser {
 
 	private AuthUser() {}
 	
-	public static Optional<Long> getUserId() {
-		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		if (auth == null) {
-            return Optional.empty();
-        }
-
-        if (!auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
-            return Optional.empty();
-        }
-		
-		Object principal = auth.getPrincipal();
-		if (principal instanceof Long userId) {
-			return Optional.of(userId);
-		}
-		
-		return Optional.empty();
-	}
-	
-	public static Long requireUserId() {
-		return getUserId().orElseThrow(() -> new BusinessException(ErrorCode.AUTH_401));
-	}
-	
 	public static Optional<User> getUser() {
 	    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 

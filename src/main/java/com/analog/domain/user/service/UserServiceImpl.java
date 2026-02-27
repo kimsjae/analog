@@ -42,7 +42,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	@Transactional(readOnly = true)
 	public MeResponse me() {
-		Long userId = AuthUser.requireUserId();
+		Long userId = AuthUser.requireUser().getId();
 		
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.RES_404, "사용자를 찾을 수 없습니다."));
@@ -52,7 +52,7 @@ public class UserServiceImpl implements UserService {
 	
 	@Override
 	public MeResponse updateMe(UpdateMeRequest request) {
-		Long userId = AuthUser.requireUserId();
+		Long userId = AuthUser.requireUser().getId();
 		
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.RES_404, "사용자를 찾을 수 없습니다."));
@@ -64,7 +64,7 @@ public class UserServiceImpl implements UserService {
 	
 	@Override
 	public UpdatePasswordResponse updatePassword(UpdatePasswordRequest request) {
-		Long userId = AuthUser.requireUserId();
+		Long userId = AuthUser.requireUser().getId();
 		
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.RES_404));

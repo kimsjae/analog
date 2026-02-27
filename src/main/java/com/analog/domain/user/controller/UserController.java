@@ -59,7 +59,7 @@ public class UserController {
 	
 	@DeleteMapping("/me")
 	public ResponseEntity<Void> withdrawMe(@Valid @RequestBody WithdrawRequest request, HttpServletResponse response) {
-		Long userId = AuthUser.requireUserId();
+		Long userId = AuthUser.requireUser().getId();
 		userService.withdraw(userId, request.password(), response);
 		
 		return ResponseEntity.noContent().build();
